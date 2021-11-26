@@ -188,3 +188,58 @@ def ensure_krb_principals(session, user, check_mode, krb_principals):
         ensure_logged_in(session)
         session.editUser(user['id'], krb_principal_mappings=mappings)
     return changes
+
+
+def task_diff_data(before, after, item_name, item_type,
+                   keys_to_copy=[], keys_to_omit=[]):
+    """
+    Prepare a dict suitable for use as the value of the 'diff' key in
+    the dict returned by an ansible task.
+
+    """
+    if before is None:
+        # Creating a new item
+        before_header = "Not present"
+        after_header = "New %s '%s'" % (item_type, item_name)
+
+        # Need to use an empty dict instead of None otherwise
+        # ansible's built-in diff callback will throw errors
+        # trying to call splitlines() on it
+        before = {}
+
+    elif after is None:
+        # Deleting an item
+        before_header = "New %s '%s'" % (item_type, item_name)
+        after_header = "Not present"
+
+        # Need to use an empty dict instead of None otherwise
+        # ansible's built-in diff callback will throw errors
+        # trying to call splitlines() on it
+        after = {}
+
+    else:
+        # Modifying an existing item
+        before_header = "Original %s '%s'" % (item_type, item_name)
+        after_header = "Modified %s '%s'" % (item_type, item_name)
+
+        # Don't accidentally modify the method params
+        after = after.copy()
+        before = before.copy()
+
+        # Avoid misleading diffs by copying some values from the
+        # before dict to the after dict
+        for key in keys_to_copy:
+            if key in before and key not in after:
+                after[key] = before[key]
+
+        # Skip some keys if they're not useful
+        for key in keys_to_omit + ['id']:
+            if key in before and key not in after:
+                del before[key]
+
+    return {
+        'before': before,
+        'after': after,
+        'before_header': before_header,
+        'after_header': after_header,
+    }
