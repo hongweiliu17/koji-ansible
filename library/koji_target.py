@@ -64,9 +64,13 @@ def ensure_target(session, name, check_mode, build_tag, dest_tag):
     :param dest_tag: Koji destination tag name, eg "f34-updates-candidate"
     """
     targetinfo = session.getBuildTarget(name)
-    result = {'changed': False, 'stdout_lines': []}
+    result = {'changed': False, 'stdout_lines': [], 'diff': {}}
+    current = targetinfo
+    new = {"name": {"build_tag_name": build_tag, "dest_tag_name": dest_tag}}
     if not targetinfo:
         result['changed'] = True
+        differences = task_diff_data(current, new, name, 'target')
+        result['diff'] = differences
         if check_mode:
             result['stdout_lines'].append('would create target %s' % name)
             return result
@@ -84,6 +88,9 @@ def ensure_target(session, name, check_mode, build_tag, dest_tag):
         result['stdout_lines'].append('dest_tag_name: %s' % dest_tag)
     if needs_edit:
         result['changed'] = True
+        differences = task_diff_data(current, new, name, 'target')
+        result['diff'] = differences
+
         if check_mode:
             return result
         common_koji.ensure_logged_in(session)
@@ -97,10 +104,13 @@ def delete_target(session, name, check_mode):
     result = dict(
         stdout='',
         changed=False,
+        diff={},
     )
     if targetinfo:
         result['stdout'] = 'deleted target %d' % targetinfo['id']
         result['changed'] = True
+        differences = task_diff_data(targetinfo, None, name, 'target')
+        result['diff'] = differences
         if not check_mode:
             common_koji.ensure_logged_in(session)
             session.deleteBuildTarget(targetinfo['id'])
